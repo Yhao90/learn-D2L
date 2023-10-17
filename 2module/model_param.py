@@ -154,3 +154,20 @@ net = nn.Sequential(
     nn.LazyLinear(128), nn.ReLU(),  # 延迟初始化
     nn.LazyLinear(10)
 )
+
+
+# 带参数的自定义层
+class MyLinear(nn.Module):
+    def __init__(self, in_units, units):
+        super().__init__()
+        self.weight = nn.Parameter(torch.randn(in_units, units))
+        self.bias = nn.Parameter(torch.randn(units, ))
+
+    def forward(self, X):
+        linear = torch.matmul(X, self.weight.data) + self.bias.data
+        return F.relu(linear)
+
+
+# 使用自定义的层来构建模型
+net = nn.Sequential(MyLinear(64, 8), MyLinear(8, 1))
+net(torch.rand(2, 64))
