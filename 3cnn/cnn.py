@@ -9,6 +9,7 @@ from d2l import torch as d2l
 
 
 # 输入大小 nℎ×n𝑤 ,核大小 kℎ×k𝑤 ,步长1的时候输出大小(nℎ−kℎ+1)×(n𝑤−k𝑤+1)
+# 步幅为 Sℎ×S𝑤 ,( (nℎ−kℎ+Sℎ)/Sℎ )×( (n𝑤−k𝑤+S𝑤)/S𝑤 )
 def corr2d(X, K):  # @save
     """计算二维互相关运算"""
     h, w = K.shape
@@ -67,8 +68,50 @@ def comp_conv2d(conv2d, X):
     return Y.reshape(Y.shape[2:])
 
 
-# 请注意，这里每边都填充了1行或1列，因此总共添加了2行或2列
-conv2d = nn.Conv2d(1, 1, kernel_size=3, padding=1) # stride=2 步幅为2
+# 请注意，这里每边都填充了1行或1列，因此总共添加了2行或2列,输入通道1，输出通道1
+conv2d = nn.Conv2d(1, 1, kernel_size=3, padding=1)  # stride=2 步幅为2
 X = torch.rand(size=(8, 8))
 comp_conv2d(conv2d, X).shape  # 输出依然是(8,8)
-conv2d = nn.Conv2d(1, 1, kernel_size=(3, 5), padding=(0, 1), stride=(3, 4)) # pad 高宽，步幅 高宽
+conv2d = nn.Conv2d(1, 1, kernel_size=(3, 5), padding=(0, 1), stride=(3, 4))  # pad 高宽，步幅 高宽
+
+
+# 多输入通道，单输出通道
+def corr2d_multi_in(X, K):
+    # 先遍历“X”和“K”的第0个维度（通道维度），再把它们加在一起
+    return sum(d2l.corr2d(x, k) for x, k in zip(X, K))
+
+
+# 多输入多输出
+def corr2d_multi_in_out(X, K):
+    # 迭代“K”的第0个维度，每次都对输入“X”执行互相关运算。
+    # 最后将所有结果都叠加在一起
+    return torch.stack([corr2d_multi_in(X, k) for k in K], 0)
+
+
+# 1x1卷积核，其实相当于全连接层
+def corr2d_multi_in_out_1x1(X, K):
+    c_i, h, w = X.shape
+    c_o = K.shape[0]
+    X = X.reshape((c_i, h * w))
+    K = K.reshape((c_o, c_i))
+    # 全连接层中的矩阵乘法
+    Y = torch.matmul(K, X)
+    return Y.reshape((c_o, h, w))
+
+
+# 池化层，我们通常希望这些特征保持某种程度上的平移不变性,降低卷积层对位置的敏感性，同时降低对空间降采样表示的敏感性。
+# 分为最大池化层和平均池化层
+def pool2d(X, pool_size, mode='max'):
+    p_h, p_w = pool_size
+    Y = torch.zeros((X.shape[0] - p_h + 1, X.shape[1] - p_w + 1))
+    for i in range(Y.shape[0]):
+        for j in range(Y.shape[1]):
+            if mode == 'max':
+                Y[i, j] = X[i: i + p_h, j: j + p_w].max()
+            elif mode == 'avg':
+                Y[i, j] = X[i: i + p_h, j: j + p_w].mean()
+    return Y
+
+# 3x3池化层，填充1，步幅2。对于多通道，是每个通道和对应的池化层计算，不像卷积一样全部计算再汇总
+pool2d = nn.MaxPool2d(3, padding=1, stride=2)
+pool2d(X)
