@@ -381,3 +381,8 @@ class Residual(nn.Module):  # @save
             X = self.conv3(X)
         Y += X
         return F.relu(Y)
+
+# DenseNet稠密网络,ResNet是相加，DenseNet是连接
+# https://zh.d2l.ai/chapter_convolutional-modern/densenet.html
+
+
